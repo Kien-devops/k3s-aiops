@@ -1,10 +1,10 @@
 import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # LLM Gateway
     ROUTER_URL: str = os.getenv("ROUTER_URL", "https://9router.onprem.site/v1")
-    ROUTER_KEY: str = os.getenv("ROUTER_KEY", "sk-a7e6ec7fa26ceade-ii35lw-eb70a6ee")
+    ROUTER_KEY: str = os.getenv("ROUTER_KEY", "")
     ROUTER_MODEL: str = os.getenv("ROUTER_MODEL", "gpt-5.6-sol")
 
     # Observability Data Sources
@@ -21,9 +21,7 @@ class Settings(BaseSettings):
     HOST: str = os.getenv("HOST", "0.0.0.0")
     APP_NAME: str = "K3s AIOps Platform"
 
-    class Config:
-        env_file = ".env"
-        extra = "allow"
+    model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
 settings = Settings()
 

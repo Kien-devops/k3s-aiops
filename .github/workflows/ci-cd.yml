@@ -1,10 +1,17 @@
 name: CI/CD Pipeline - K3s AIOps Platform
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.gitignore'
   push:
     branches:
       - main
-      - master
+      - 'feature/**'
     paths-ignore:
       - 'README.md'
       - 'docs/**'
@@ -20,10 +27,56 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/k3s-aiops-backend
 
 jobs:
+  test:
+    name: 🧪 Run Unit & Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Pytest Suite
+        run: |
+          PYTHONPATH=backend python -m pytest backend/tests -v --durations=10
+
+  security-scan:
+    name: 🛡️ Security Vulnerability Scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Repository Scan
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
   build-and-push:
-    name: 🐳 Build & Push Backend to GHCR
+    name: 🐳 Build & Push Immutable Container Image
+    needs: [test, security-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_digest: ${{ steps.build-push.outputs.digest }}
 
     steps:
       - name: Checkout Code
@@ -39,66 +92,91 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
+      - name: Extract Metadata (Tags & Labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
-            type=sha,format=short
+            type=sha,format=long,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and Push Docker image
+      - name: Build and Push Image
+        id: build-push
         uses: docker/build-push-action@v5
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: true
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-self-hosted:
-    name: 🚀 Rollout on K3s Cluster (Self-Hosted Runner)
+  deploy-k3s:
+    name: 🚀 Deploy to K3s Production (Self-Hosted Runner)
     needs: build-and-push
+    # Strictly deploy ONLY on push to main branch! Feature branches and PRs NEVER deploy.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: [self-hosted, Linux]
     timeout-minutes: 10
-    continue-on-error: true
 
     steps:
-      - name: Rollout Restart Pod on K3s
+      - name: Verify Image Digest
+        id: verify-digest
         shell: bash
         run: |
-          echo "=== ROLLING OUT NEW IMAGE TO K3S AIOPS BACKEND ==="
-          kubectl rollout restart deployment/aiops-backend -n aiops
-          echo "Waiting for rollout to finish..."
-          kubectl rollout status deployment/aiops-backend -n aiops --timeout=120s
-          echo "=== DEPLOYMENT COMPLETED SUCCESSFULLY ==="
-          kubectl get pods -n aiops -l app=aiops-backend -o wide
+          DIGEST="${{ needs.build-and-push.outputs.image_digest }}"
+          if [[ -z "$DIGEST" ]]; then
+            echo "::error::Image digest is empty! Cannot proceed with immutable deployment."
+            exit 1
+          fi
+          echo "Target Digest: $DIGEST"
+          echo "TARGET_IMAGE_URI=ghcr.io/${{ env.IMAGE_NAME }}@${DIGEST}" >> "$GITHUB_ENV"
 
-  deploy-ssh-fallback:
-    name: 🌐 Rollout on K3s Cluster (SSH Remote Fallback)
-    needs: [build-and-push, deploy-self-hosted]
-    if: needs.deploy-self-hosted.result != 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+      - name: Deploy Immutable Image to K3s Cluster
+        shell: bash
+        run: |
+          echo "=== Deploying Immutable Image: $TARGET_IMAGE_URI ==="
+          kubectl -n aiops set image deployment/aiops-backend backend="$TARGET_IMAGE_URI"
 
-    steps:
-      - name: Execute Remote Rollout via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        if: env.K3S_HOST != ''
-        env:
-          K3S_HOST: ${{ secrets.K3S_HOST }}
-        with:
-          host: ${{ secrets.K3S_HOST }}
-          username: ${{ secrets.K3S_USER || 'node' }}
-          password: ${{ secrets.K3S_PASSWORD }}
-          key: ${{ secrets.K3S_SSH_KEY }}
-          port: 22
-          script: |
-            echo "=== TRIGGERING REMOTE ROLLOUT ON K3S ==="
-            sudo k3s kubectl rollout restart deployment/aiops-backend -n aiops
-            sudo k3s kubectl rollout status deployment/aiops-backend -n aiops --timeout=120s
-            sudo k3s kubectl get pods -n aiops -l app=aiops-backend -o wide
+      - name: Verify Rollout Status
+        shell: bash
+        run: |
+          echo "Waiting for rollout to finish successfully..."
+          kubectl -n aiops rollout status deployment/aiops-backend --timeout=180s
 
+      - name: Verify Deployed Pod Image Digest
+        shell: bash
+        run: |
+          echo "Verifying running pod image matches target digest..."
+          DEPLOYED_IMG=$(kubectl -n aiops get deployment aiops-backend -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "Deployed image in spec: $DEPLOYED_IMG"
+          if [[ "$DEPLOYED_IMG" != "$TARGET_IMAGE_URI" ]]; then
+            echo "::error::Digest mismatch! Expected: $TARGET_IMAGE_URI, Found: $DEPLOYED_IMG"
+            exit 1
+          fi
+          echo "Digest verified successfully!"
+
+      - name: Run Smoke Tests on Health Endpoints
+        shell: bash
+        run: |
+          echo "=== Running Cluster-Internal Smoke Test ==="
+          POD_IP=$(kubectl -n aiops get pods -l app=aiops-backend -o jsonpath='{.items[0].status.podIP}')
+          echo "Target Pod IP: $POD_IP"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://${POD_IP}:8000/api")
+          echo "Response HTTP Status: $HTTP_STATUS"
+          if [[ "$HTTP_STATUS" != "200" ]]; then
+            echo "::error::Smoke test failed with status $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Smoke test passed with HTTP 200 OK!"
+
+      - name: Rollback on Failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "::warning::Deployment or smoke tests failed! Initiating rollback to previous revision..."
+          kubectl -n aiops rollout undo deployment/aiops-backend
+          kubectl -n aiops rollout status deployment/aiops-backend --timeout=120s
+          echo "Rollback completed."

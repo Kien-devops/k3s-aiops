@@ -62,11 +62,23 @@ class ContextBuilder:
         if events:
             events_str = "\n".join([f"- [{e['time']}] {e['namespace']}/{e['object']}: {e['reason']} - {e['message']}" for e in events[:5]])
 
+        node_metrics = context.get("node_metrics", [])
+        metrics_str = "None"
+        if node_metrics:
+            metrics_str = "\n".join([f"- {m['instance']}: CPU {m.get('cpu_percent', 0):.1f}%, RAM {m.get('mem_percent', 0):.1f}%" for m in node_metrics])
+
+        error_logs = context.get("recent_error_logs", [])
+        logs_str = "None"
+        if error_logs:
+            logs_str = "\n".join([f"- [{l.get('time', 'unknown')}] ({l.get('app', 'app')}): {l.get('line', '')[:200]}" for l in error_logs[:5]])
+
         return f"""### LIVE K3S CLUSTER TELEMETRY CONTEXT:
 * **Cluster Health Score**: {health['score']}/100 ({health['rating']})
 * **Estimated Wall Power**: {power} Watts
 * **Nodes**:
 {node_str}
+* **Node CPU/RAM Metrics**:
+{metrics_str}
 * **Pods Status**: {pods_sum['running']}/{pods_sum['total']} Running, {pods_sum['terminating']} Terminating
 * **Abnormal / Stuck Pods**:
 {abnormal_str}
@@ -74,6 +86,8 @@ class ContextBuilder:
 {anomalies_str}
 * **Recent K8s Warning Events**:
 {events_str}
+* **Recent Application Error Logs (Loki)**:
+{logs_str}
 """
 
 context_builder = ContextBuilder()

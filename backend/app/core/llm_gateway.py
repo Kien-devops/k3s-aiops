@@ -21,12 +21,20 @@ class LLMGateway:
         """
         Send chat completion request to 9Router LLM Gateway.
         """
+        if not self.api_key:
+            logger.error("ROUTER_KEY is not configured in environment.")
+            return {
+                "success": False,
+                "error": "ROUTER_KEY is not configured. Please set ROUTER_KEY in secrets.",
+                "content": "Lỗi cấu hình: Chưa thiết lập ROUTER_KEY trong Secret của cụm."
+            }
+
         chosen_model = model or self.default_model
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "AIOps-Engine/1.0"
+            "User-Agent": "AIOps-Engine/2.0"
         }
         payload = {
             "model": chosen_model,
@@ -35,7 +43,7 @@ class LLMGateway:
             "max_tokens": max_tokens
         }
 
-        async with httpx.AsyncClient(verify=False, timeout=60.0) as client:
+        async with httpx.AsyncClient(verify=True, timeout=60.0) as client:
             try:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
@@ -66,12 +74,18 @@ class LLMGateway:
 
     async def test_connection(self) -> Dict[str, Any]:
         """Verify LLM Gateway connection and model availability."""
+        if not self.api_key:
+            return {
+                "status": "unhealthy",
+                "error": "ROUTER_KEY is not configured"
+            }
+
         url = f"{self.base_url}/models"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "User-Agent": "AIOps-Engine/1.0"
+            "User-Agent": "AIOps-Engine/2.0"
         }
-        async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+        async with httpx.AsyncClient(verify=True, timeout=10.0) as client:
             try:
                 resp = await client.get(url, headers=headers)
                 resp.raise_for_status()
