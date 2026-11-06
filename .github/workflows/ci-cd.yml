@@ -101,3 +101,4 @@ jobs:
             sudo k3s kubectl rollout restart deployment/aiops-backend -n aiops
             sudo k3s kubectl rollout status deployment/aiops-backend -n aiops --timeout=120s
             sudo k3s kubectl get pods -n aiops -l app=aiops-backend -o wide
+

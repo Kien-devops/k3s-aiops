@@ -23,7 +23,7 @@ spec:
       containers:
         - name: backend
           image: ghcr.io/kien-devops/k3s-aiops-backend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
 
 
           ports:
