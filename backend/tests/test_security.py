@@ -32,3 +32,4 @@ async def test_llm_gateway_handles_missing_key_safely():
         assert "ROUTER_KEY" in resp["error"]
     finally:
         llm_gateway.api_key = original_key
+

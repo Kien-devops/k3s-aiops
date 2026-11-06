@@ -40,3 +40,4 @@ def test_score_clamping_at_zero():
     result = calculate_cluster_health_score(nodes, pods, events, power_watts=500.0)
     assert result["score"] >= 0.0
     assert result["rating"] == "Nguy cấp (Critical)"
+

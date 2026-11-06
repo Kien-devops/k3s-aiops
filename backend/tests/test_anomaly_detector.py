@@ -36,3 +36,4 @@ def test_detect_high_resource_thresholds():
     categories = [a["category"] for a in anomalies]
     assert "Resource" in categories
     assert "Energy" in categories
+
