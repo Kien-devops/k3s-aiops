@@ -107,3 +107,4 @@ spec:
       targetPort: 3100
   selector:
     app: loki
+

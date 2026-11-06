@@ -54,3 +54,4 @@ async def root():
         "model": settings.ROUTER_MODEL,
         "llm_gateway": settings.ROUTER_URL
     }
+

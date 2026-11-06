@@ -41,3 +41,4 @@ class LokiClient:
                 return False
 
 loki_client = LokiClient()
+

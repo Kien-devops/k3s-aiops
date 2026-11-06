@@ -34,3 +34,4 @@ subjects:
   - kind: ServiceAccount
     name: aiops-backend-sa
     namespace: aiops
+

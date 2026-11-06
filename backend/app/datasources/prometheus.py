@@ -80,3 +80,4 @@ class PrometheusClient:
                 return {"total": 0, "up": 0, "down": 0, "status": "unreachable", "error": str(e)}
 
 prom_client = PrometheusClient()
+

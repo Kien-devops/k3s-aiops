@@ -18,10 +18,14 @@ spec:
       serviceAccountName: aiops-backend-sa
       nodeSelector:
         kubernetes.io/hostname: server-tang4
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: backend
-          image: k3s-aiops-backend:latest
+          image: ghcr.io/kien-devops/k3s-aiops-backend:latest
           imagePullPolicy: IfNotPresent
+
+
           ports:
             - containerPort: 8000
               name: http
@@ -60,16 +64,20 @@ spec:
               memory: 384Mi
           livenessProbe:
             httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
-          readinessProbe:
-            httpGet:
-              path: /api/health
+              path: /api
               port: 8000
             initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: 8000
+            initialDelaySeconds: 3
             periodSeconds: 10
+            timeoutSeconds: 3
+
+
 ---
 apiVersion: v1
 kind: Service

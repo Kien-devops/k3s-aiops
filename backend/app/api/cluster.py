@@ -40,3 +40,4 @@ async def get_anomalies():
         "total": len(ctx["anomalies"]),
         "anomalies": ctx["anomalies"]
     }
+

@@ -10,6 +10,12 @@ router = APIRouter(prefix="/api/health", tags=["Health"])
 
 @router.get("")
 async def get_health():
+    """Fast probe endpoint for Kubernetes liveness/readiness probes."""
+    return {"status": "ok", "service": settings.APP_NAME}
+
+@router.get("/details")
+async def get_health_details():
+    """Detailed health check for all upstream observability and AI integrations."""
     llm_status = await llm_gateway.test_connection()
     prom_status = await prom_client.get_targets_status()
     loki_ready = await loki_client.check_health()
@@ -42,3 +48,4 @@ async def get_health():
             }
         }
     }
+

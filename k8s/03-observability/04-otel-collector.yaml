@@ -99,3 +99,4 @@ spec:
       targetPort: 4318
   selector:
     app: otel-collector
+

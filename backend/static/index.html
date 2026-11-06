@@ -303,13 +303,17 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang Phân Tích...';
       container.innerHTML = `
         <div class="flex flex-col items-center justify-center py-8 text-indigo-400 gap-3">
-          <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
-          <span class="text-xs">Mô hình GPT-5.6 Sol đang chẩn đoán viễn trắc cụm K3s...</span>
+          <i class="fa-solid fa-brain fa-bounce text-2xl text-indigo-400"></i>
+          <span class="text-xs font-medium text-slate-300">GPT-5.6 Sol đang chẩn đoán viễn trắc telemetry cụm K3s (khoảng 15-20s)...</span>
         </div>
       `;
 
       try {
         const resp = await fetch('/api/aiops/analyze', { method: 'POST' });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`Server phản hồi lỗi ${resp.status}`);
+        }
         const data = await resp.json();
         if (data.success && data.analysis) {
           container.className = "prose prose-invert max-w-none text-xs leading-relaxed";
@@ -318,12 +322,13 @@
           container.innerHTML = `<div class="text-rose-400 py-4">Lỗi: ${data.analysis || 'Không nhận được phân tích'}</div>`;
         }
       } catch (err) {
-        container.innerHTML = `<div class="text-rose-400 py-4">Lỗi kết nối API: ${err.message}</div>`;
+        container.innerHTML = `<div class="text-rose-400 py-4">⚠️ Lỗi kết nối: ${err.message}</div>`;
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Chạy Lại Phân Tích';
       }
     }
+
 
     async function sendChat(e) {
       e.preventDefault();
@@ -348,9 +353,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: chatHistory })
         });
-        const data = await resp.json();
         removeChatLoading(loadingId);
 
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`Server phản hồi lỗi ${resp.status}`);
+        }
+
+        const data = await resp.json();
         if (data.success && data.content) {
           appendChatMessage('assistant', data.content);
           chatHistory.push({ role: 'assistant', content: data.content });
@@ -363,6 +373,7 @@
       } finally {
         btn.disabled = false;
       }
+
     }
 
     function appendChatMessage(role, text) {
@@ -427,3 +438,4 @@
   </script>
 </body>
 </html>
+

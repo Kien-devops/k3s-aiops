@@ -87,3 +87,4 @@ def detect_cluster_anomalies(
         })
 
     return anomalies
+

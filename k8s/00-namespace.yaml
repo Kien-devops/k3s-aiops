@@ -4,3 +4,4 @@ metadata:
   name: aiops
   labels:
     app.kubernetes.io/name: aiops-platform
+

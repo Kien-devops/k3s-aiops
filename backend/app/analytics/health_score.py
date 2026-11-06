@@ -81,3 +81,4 @@ def calculate_cluster_health_score(
             "power_watts": power_watts
         }
     }
+
