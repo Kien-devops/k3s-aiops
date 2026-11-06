@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Query
 from typing import Optional
 from app.core.context_builder import context_builder
@@ -18,7 +19,7 @@ async def get_cluster_status():
 
 @router.get("/nodes")
 async def get_nodes():
-    nodes = k8s_client.get_nodes()
+    nodes = await asyncio.to_thread(k8s_client.get_nodes)
     node_metrics = await prom_client.get_node_resource_metrics()
     return {
         "nodes": nodes,
@@ -27,7 +28,7 @@ async def get_nodes():
 
 @router.get("/pods")
 async def get_pods(namespace: Optional[str] = Query(None)):
-    pods = k8s_client.get_pods(namespace=namespace)
+    pods = await asyncio.to_thread(k8s_client.get_pods, namespace)
     return {
         "total": len(pods),
         "pods": pods

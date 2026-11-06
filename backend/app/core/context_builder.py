@@ -1,4 +1,5 @@
 import json
+import asyncio
 from typing import Dict, Any
 from app.core.k8s_client import k8s_client
 from app.datasources.prometheus import prom_client
@@ -9,14 +10,24 @@ from app.analytics.anomaly_detector import detect_cluster_anomalies
 class ContextBuilder:
     async def build_cluster_context(self) -> Dict[str, Any]:
         """
-        Gathers live state from K3s API, Prometheus, and Loki.
+        Gathers live state from K3s API, Prometheus, and Loki concurrently without blocking the event loop.
         """
-        nodes = k8s_client.get_nodes()
-        pods = k8s_client.get_pods()
-        events = k8s_client.get_recent_warning_events(limit=10)
-        power_watts = await prom_client.get_cluster_power_watts()
-        node_metrics = await prom_client.get_node_resource_metrics()
-        loki_logs = await loki_client.query_logs(limit=10)
+        nodes_task = asyncio.to_thread(k8s_client.get_nodes)
+        pods_task = asyncio.to_thread(k8s_client.get_pods)
+        events_task = asyncio.to_thread(k8s_client.get_recent_warning_events, 10)
+        power_task = prom_client.get_cluster_power_watts()
+        metrics_task = prom_client.get_node_resource_metrics()
+        loki_task = loki_client.query_logs(limit=10)
+
+        nodes, pods, events, power_watts, node_metrics, loki_logs = await asyncio.gather(
+            nodes_task,
+            pods_task,
+            events_task,
+            power_task,
+            metrics_task,
+            loki_task,
+            return_exceptions=False
+        )
 
         health_data = calculate_cluster_health_score(nodes, pods, events, power_watts)
         anomalies = detect_cluster_anomalies(nodes, pods, events, power_watts, node_metrics)
