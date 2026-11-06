@@ -162,10 +162,8 @@ jobs:
       - name: Run Smoke Tests on Health Endpoints
         shell: bash
         run: |
-          echo "=== Running Cluster-Internal Smoke Test ==="
-          POD_IP=$(kubectl -n aiops get pods -l app=aiops-backend -o jsonpath='{.items[0].status.podIP}')
-          echo "Target Pod IP: $POD_IP"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://${POD_IP}:8000/api")
+          echo "=== Running End-to-End Ingress Smoke Test ==="
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: aiops.onprem.site" --max-time 15 "http://192.168.30.35/api")
           echo "Response HTTP Status: $HTTP_STATUS"
           if [[ "$HTTP_STATUS" != "200" ]]; then
             echo "::error::Smoke test failed with status $HTTP_STATUS"
