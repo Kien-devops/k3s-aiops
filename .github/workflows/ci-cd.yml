@@ -24,7 +24,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/k3s-aiops-backend
+  IMAGE_NAME: kien-devops/k3s-aiops-backend
 
 jobs:
   test:
@@ -132,7 +132,8 @@ jobs:
             exit 1
           fi
           echo "Target Digest: $DIGEST"
-          echo "TARGET_IMAGE_URI=ghcr.io/${{ env.IMAGE_NAME }}@${DIGEST}" >> "$GITHUB_ENV"
+          LOWER_IMAGE=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "TARGET_IMAGE_URI=ghcr.io/${LOWER_IMAGE}@${DIGEST}" >> "$GITHUB_ENV"
 
       - name: Deploy Immutable Image to K3s Cluster
         shell: bash
