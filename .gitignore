@@ -1,0 +1,36 @@
+# Secrets and sensitive cluster credentials
+kubeconfig.yaml
+k8s/02-secrets.yaml
+*secret*.yaml
+*secret*.yml
+*.key
+*.pem
+.env
+.env.local
+*.tar
+*.tar.gz
+
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+.npm
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
